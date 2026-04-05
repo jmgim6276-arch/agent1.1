@@ -15,14 +15,35 @@ import sys
 import time
 import requests
 import websocket
+import subprocess
+import os
 
 BASE_URL = "https://cst.uf-tree.com"
 
 # 支持的浏览器 CDP 端口
 BROWSERS = [
-    {"name": "Edge", "port": 9223, "url": "http://localhost:9223/json"},
-    {"name": "Chrome", "port": 18800, "url": "http://localhost:18800/json"},
+    {"name": "Edge", "port": 9223, "url": "http://localhost:9223/json", "path": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"},
+    {"name": "Chrome", "port": 18800, "url": "http://localhost:18800/json", "path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"},
 ]
+
+
+def launch_browser(browser):
+    """启动浏览器并启用调试模式"""
+    try:
+        if os.path.exists(browser["path"]):
+            print(f"正在启动 {browser['name']} 浏览器...")
+            subprocess.Popen([
+                browser["path"],
+                f"--remote-debugging-port={browser['port']}",
+                "--remote-allow-origins=*",
+                "https://cst.uf-tree.com"
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"⏳ 等待 {browser['name']} 启动...")
+            time.sleep(3)
+            return True
+    except Exception as e:
+        print(f"启动 {browser['name']} 失败: {e}")
+    return False
 
 
 def find_browser():
@@ -111,13 +132,24 @@ def main():
     # 0) 浏览器检测
     print("---- 浏览器检测 ----")
     browser = find_browser()
+    
+    if not browser:
+        print("未检测到可用的浏览器，尝试自动启动...")
+        for b in BROWSERS:
+            if launch_browser(b):
+                browser = find_browser()
+                if browser:
+                    break
+        time.sleep(2)  # 再给点时间启动
+        browser = find_browser()
+    
     if not browser:
         fail("未检测到可用的浏览器")
-        print("\n请按以下步骤操作：")
-        print("1. 打开 Edge 浏览器:")
-        print("   /Applications/Microsoft\\ Edge.app/Contents/MacOS/Microsoft\\ Edge --remote-debugging-port=9223 --remote-allow-origins=*")
-        print("2. 或打开 Chrome 浏览器:")
-        print("   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=18800 --remote-allow-origins=*")
+        print("\n请手动启动浏览器:")
+        print("1. Edge:")
+        print("   /Applications/Microsoft\\ Edge.app/Contents/MacOS/Microsoft\\ Edge --remote-debugging-port=9223 --remote-allow-origins='*'")
+        print("2. Chrome:")
+        print("   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=18800 --remote-allow-origins='*'")
         print("3. 登录 https://cst.uf-tree.com")
         return 1
 
